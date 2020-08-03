@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=Edge">
+		<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+		<title>I420 Demo</title>
+	</head>
+	<body>
+		<div>
+			<div style="float: left; margin: 4px;">
+				<p>Origin image</p>
+				<canvas id="canvas-src" width="240" height="240" style="border: 1px solid #000000;"></canvas>
+			</div>
+			<div style="float: left; margin: 4px;">
+				<p>I420 (BT.601)</p>
+				<canvas id="canvas-dst-bt601" width="240" height="240" style="border: 1px solid #000000;"></canvas>
+			</div>
+			<div style="float: left; margin: 4px;">
+				<p>I420 (BT.709)</p>
+				<canvas id="canvas-dst-bt709" width="240" height="240" style="border: 1px solid #000000;"></canvas>
+			</div>
+			<div style="float: left; margin: 4px;">
+				<p>BT.601 enc, BT.709 dec</p>
+				<canvas id="canvas-dst-bt601-bt709" width="240" height="240" style="border: 1px solid #000000;"></canvas>
+			</div>
+			<div style="clear: both;"></div>
+		</div>
+		<div>
+			<canvas id="canvas-image"></canvas>
+		</div>
+		<script>
+"use strict";
+
+function to_yuv_bt601(rgb) { // https://www.zhihu.com/question/20656646
+	var r = rgb[0];
+	var g = rgb[1];
+	var b = rgb[2];
+	var y =  0.2568 * r +  0.5041 * g +  0.0979 * b +  16;
+	var u = -0.1479 * r + -0.2896 * g +  0.4375 * b + 128;
+	var v =  0.4375 * r + -0.3666 * g + -0.0709 * b + 128;
+	return [(y + .5) | 0, (u + .5) | 0, (v + .5) | 0];
+}
+
+function to_rgb_bt601(yuv) {
+	var y = yuv[0];
+	var u = yuv[1];
+	var v = yuv[2];
+	var r = 1.1644 * y +  0.0000 * u +  1.6019 * v + -223.5521;
+	var g = 1.1644 * y + -0.3928 * u + -0.8163 * v +  136.1381;
+	var b = 1.1644 * y +  2.0253 * u +  0.0000 * v + -278.0291;
+	return [(r + .5) | 0, (g + .5) | 0, (b + .5) | 0];
+}
+
+function to_yuv_bt709(rgb) { // http://www.compression.ru/download/articles/color_space/ch03.pdf
+	var r = rgb[0];
+	var g = rgb[1];
+	var b = rgb[2];
+	var y =  0.183 * r +  0.614 * g +  0.062 * b +  16;
+	var u = -0.101 * r + -0.339 * g +  0.439 * b + 128;
+	var v =  0.439 * r + -0.399 * g + -0.040 * b + 128;
+	return [(y + .5) | 0, (u + .5) | 0, (v + .5) | 0];
+}
+
+function to_rgb_bt709(yuv) {
+	var y = yuv[0];
+	var u = yuv[1];
+	var v = yuv[2];
+	var r = 1.164 * (y - 16) + -0.000 * (u - 128) +  1.793 * (v - 128);
+	var g = 1.164 * (y - 16) + -0.213 * (u - 128) + -0.534 * (v - 128);
+	var b = 1.164 * (y - 16) +  2.115 * (u - 128) +  0.000 * (v - 128);
+	return [(r + .5) | 0, (g + .5) | 0, (b + .5) | 0];
+}
+
+function rgb_to_i420_to_rgb(pixels_src, to_yuv, to_rgb) {
+	var pixels_yuv = [to_yuv(pixels_src[0]), to_yuv(pixels_src[1]), to_yuv(pixels_src[2]), to_yuv(pixels_src[3])];
+	var u_avg = (pixels_yuv[0][1] + pixels_yuv[1][1] + pixels_yuv[2][1] + pixels_yuv[3][1]) / 4;
+	var v_avg = (pixels_yuv[0][2] + pixels_yuv[1][2] + pixels_yuv[2][2] + pixels_yuv[3][2]) / 4;
+	var pixels_i420 = [
+		[pixels_yuv[0][0], u_avg, v_avg], [pixels_yuv[1][0], u_avg, v_avg],
+		[pixels_yuv[2][0], u_avg, v_avg], [pixels_yuv[3][0], u_avg, v_avg],
+	];
+	var pixels_dst = [to_rgb(pixels_i420[0]), to_rgb(pixels_i420[1]), to_rgb(pixels_i420[2]), to_rgb(pixels_i420[3])];
+	return pixels_dst;
+}
+
+function draw(canvas, pixels, x0, y0, side) {
+	function str(rgb) { return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`; }
+	var ctx = canvas.getContext("2d");
+	ctx.fillStyle = str(pixels[0]);
+	ctx.fillRect(x0, y0, side, side);
+	ctx.fillStyle = str(pixels[1]);
+	ctx.fillRect(x0 + side, y0, side, side);
+	ctx.fillStyle = str(pixels[2]);
+	ctx.fillRect(x0, y0 + side, side, side);
+	ctx.fillStyle = str(pixels[3]);
+	ctx.fillRect(x0 + side, y0 + side, side, side);
+}
+
+(function () { // draw example image
+	var canvas = document.getElementById("canvas-image");
+	var context = canvas.getContext("2d");
+	canvas.width = 800;
+	canvas.height = 400;
+	var grad = context.createLinearGradient(0, 0, canvas.width, canvas.height);
+	grad.addColorStop(0, `rgb(255, 255, 0)`);
+	grad.addColorStop(1, `rgb(128, 0, 255)`);
+	context.fillStyle = grad;
+	context.fillRect(0, 0, canvas.width, canvas.height);
+	context.font = "20px Arial";
+	context.fillStyle = "black";
+	context.fillText("Tips", 50, 70);
+	context.fillText("1. Move mouse here to view color damage caused by I420 transformation.", 50, 100);
+	context.fillText("2. Drag image here to change image.", 50, 130);
+	context.font = "80px Arial";
+	context.fillStyle = "rgba(255, 255, 255, 0.3)";
+	context.fillText("Example", 100, 240);
+	context.fillStyle = "rgba(0, 0, 0, 0.3)";
+	context.fillText("Example", 270, 340);
+	context.fillStyle = "rgba(255, 0, 0, 0.3)";
+	context.fillText("Example", 420, 290);
+	context.fillStyle = "rgba(0, 255, 0, 0.3)";
+	context.fillText("Example", 350, 210);
+})();
+
+var side_length = 2 * 20;
+var canvas_image = document.getElementById("canvas-image");
+canvas_image.addEventListener("mousemove", ev => {
+	var canvas_src = document.getElementById("canvas-src");
+	canvas_src.getContext("2d").clearRect(0, 0, canvas_src.width, canvas_src.height);
+	var canvas_dst_bt601 = document.getElementById("canvas-dst-bt601");
+	canvas_dst_bt601.getContext("2d").clearRect(0, 0, canvas_dst_bt601.width, canvas_dst_bt601.height);
+	var canvas_dst_bt709 = document.getElementById("canvas-dst-bt709");
+	canvas_dst_bt709.getContext("2d").clearRect(0, 0, canvas_dst_bt709.width, canvas_dst_bt709.height);
+	var canvas_dst_bt601_bt709 = document.getElementById("canvas-dst-bt601-bt709");
+	canvas_dst_bt601_bt709.getContext("2d").clearRect(0, 0, canvas_dst_bt601_bt709.width, canvas_dst_bt601_bt709.height);
+
+	var n = side_length;
+	var a = canvas_src.width / side_length;
+	var x = (ev.offsetX - n / 2) & -1;
+	var y = (ev.offsetY - n / 2) & -1;
+	var data = canvas_image.getContext("2d").getImageData(x & ~1, y & ~1, n, n).data;
+
+	for (var i = 0; i < n; i += 2) {
+		for (var j = 0; j < n; j += 2) {
+			var off_1 = (i * n + j) * 4;
+			var off_2 = ((i + 1) * n + j) * 4;
+			var pixels_src = [
+				data.slice(off_1 + 0, off_1 + 3), data.slice(off_1 + 4, off_1 + 7),
+				data.slice(off_2 + 0, off_2 + 3), data.slice(off_2 + 4, off_2 + 7),
+			];
+			var pixels_dst_bt601 = rgb_to_i420_to_rgb(pixels_src, to_yuv_bt601, to_rgb_bt601);
+			var pixels_dst_bt709 = rgb_to_i420_to_rgb(pixels_src, to_yuv_bt709, to_rgb_bt709);
+			var pixels_dst_bt601_bt709 = rgb_to_i420_to_rgb(pixels_src, to_yuv_bt601, to_rgb_bt709);
+
+			draw(canvas_src, pixels_src, j * a, i * a, a);
+			draw(canvas_dst_bt601, pixels_dst_bt601, j * a, i * a, a);
+			draw(canvas_dst_bt709, pixels_dst_bt709, j * a, i * a, a);
+			draw(canvas_dst_bt601_bt709, pixels_dst_bt601_bt709, j * a, i * a, a);
+		}
+	}
+});
+
+document.body.addEventListener("drop", ev => {
+	ev.preventDefault();
+	var file = ev.dataTransfer.files[0],
+	reader = new FileReader();
+	reader.onload = function (event) {
+		var image = new Image();
+		image.addEventListener("load", ev => {
+			var canvas_image = document.getElementById("canvas-image");
+			canvas_image.width = image.width;
+			canvas_image.height = image.height;
+			var context = canvas_image.getContext("2d");
+			context.drawImage(image, 0, 0, image.width, image.height);
+		});
+		image.src = event.target.result;
+	};
+	reader.readAsDataURL(file);
+});
+
+document.body.addEventListener("dragover", ev => {
+	ev.preventDefault();
+});
+		</script>
+	</body>
+</html>
