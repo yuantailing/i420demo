@@ -39,7 +39,7 @@ function to_yuv_bt601(rgb) { // https://www.zhihu.com/question/20656646
 	var y =  0.2568 * r +  0.5041 * g +  0.0979 * b +  16;
 	var u = -0.1479 * r + -0.2896 * g +  0.4375 * b + 128;
 	var v =  0.4375 * r + -0.3666 * g + -0.0709 * b + 128;
-	return [(y + .5) | 0, (u + .5) | 0, (v + .5) | 0];
+	return [(y + .5) | 0, u, v];
 }
 
 function to_rgb_bt601(yuv) {
@@ -59,7 +59,7 @@ function to_yuv_bt709(rgb) { // http://www.compression.ru/download/articles/colo
 	var y =  0.183 * r +  0.614 * g +  0.062 * b +  16;
 	var u = -0.101 * r + -0.339 * g +  0.439 * b + 128;
 	var v =  0.439 * r + -0.399 * g + -0.040 * b + 128;
-	return [(y + .5) | 0, (u + .5) | 0, (v + .5) | 0];
+	return [(y + .5) | 0, u, v];
 }
 
 function to_rgb_bt709(yuv) {
@@ -74,8 +74,8 @@ function to_rgb_bt709(yuv) {
 
 function rgb_to_i420_to_rgb(pixels_src, to_yuv, to_rgb) {
 	var pixels_yuv = [to_yuv(pixels_src[0]), to_yuv(pixels_src[1]), to_yuv(pixels_src[2]), to_yuv(pixels_src[3])];
-	var u_avg = (pixels_yuv[0][1] + pixels_yuv[1][1] + pixels_yuv[2][1] + pixels_yuv[3][1]) / 4;
-	var v_avg = (pixels_yuv[0][2] + pixels_yuv[1][2] + pixels_yuv[2][2] + pixels_yuv[3][2]) / 4;
+	var u_avg = ((pixels_yuv[0][1] + pixels_yuv[1][1] + pixels_yuv[2][1] + pixels_yuv[3][1]) / 4 + .5) | 0;
+	var v_avg = ((pixels_yuv[0][2] + pixels_yuv[1][2] + pixels_yuv[2][2] + pixels_yuv[3][2]) / 4 + .5) | 0;
 	var pixels_i420 = [
 		[pixels_yuv[0][0], u_avg, v_avg], [pixels_yuv[1][0], u_avg, v_avg],
 		[pixels_yuv[2][0], u_avg, v_avg], [pixels_yuv[3][0], u_avg, v_avg],
@@ -116,9 +116,9 @@ function draw(canvas, pixels, x0, y0, side) {
 	context.fillStyle = "rgba(255, 255, 255, 0.3)";
 	context.fillText("Example", 100, 240);
 	context.fillStyle = "rgba(0, 0, 0, 0.3)";
-	context.fillText("Example", 270, 340);
+	context.fillText("Example", 270, 335);
 	context.fillStyle = "rgba(255, 0, 0, 0.3)";
-	context.fillText("Example", 420, 290);
+	context.fillText("Example", 420, 285);
 	context.fillStyle = "rgba(0, 255, 0, 0.3)";
 	context.fillText("Example", 350, 210);
 })();
